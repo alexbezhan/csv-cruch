@@ -1,33 +1,30 @@
 package app
 
-import akka.actor.{Actor, ActorLogging}
+import akka.actor.{Actor, ActorLogging, ActorRef}
 import akka.http.scaladsl.Http
-import akka.http.scaladsl.model._
 import akka.http.scaladsl.server.Directives._
 import akka.http.scaladsl.server.Route
+import akka.pattern.ask
 import akka.stream.ActorMaterializer
+import akka.util.Timeout
+import app.CsvService.{CountLines, LinesCount}
 
 import scala.concurrent.Future
+import scala.concurrent.duration._
 
-class WebServer extends Actor() with ActorLogging {
+class WebServer(csvService: ActorRef) extends Actor() with ActorLogging {
 
   import context.dispatcher
 
-  implicit val materializer: ActorMaterializer = ActorMaterializer()(context)
+  private implicit val materializer: ActorMaterializer = ActorMaterializer()(context)
+  private implicit val timeout: Timeout = Timeout(10 seconds)
 
   val route: Route =
-    path("/") {
+    path("") {
       get {
-        complete(HttpEntity(ContentTypes.`text/plain(UTF-8)`, "Hello World"))
+        complete((csvService ? CountLines).mapTo[LinesCount].map(_.count.toString))
       }
-    } ~
-      path("/fetch") {
-        get {
-          parameter("link") { link =>
-            complete(StatusCodes.OK, link)
-          }
-        }
-      }
+    }
 
   private var binding: Future[Http.ServerBinding] = _
 

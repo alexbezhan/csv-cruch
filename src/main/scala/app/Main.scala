@@ -1,6 +1,8 @@
 package app
 
 import akka.actor.{ActorSystem, Props}
+import akka.cluster.routing.{ClusterRouterPool, ClusterRouterPoolSettings}
+import akka.routing.RoundRobinPool
 import com.typesafe.config.ConfigFactory
 
 object Main {
@@ -24,7 +26,12 @@ object Main {
     }.last
 
     if (role == "server") {
-      system.actorOf(Props[WebServer], "web-server")
+      val workersRouter = {
+        val pool = ClusterRouterPool(RoundRobinPool(0), ClusterRouterPoolSettings(10, 5, allowLocalRoutees = true))
+        system.actorOf(pool.props(Props[CsvWorker]), "csv-workers-router")
+      }
+      val csvService = system.actorOf(Props(new CsvService(workersRouter)), "csv-service")
+      system.actorOf(Props(new WebServer(csvService)), "web-server")
     }
   }
 }
