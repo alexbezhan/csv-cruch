@@ -2,13 +2,16 @@ package app
 
 import java.io.File
 
-import akka.actor.{Actor, ActorLogging, ActorRef}
+import akka.actor.{Actor, ActorLogging, ActorRef, Props}
+import akka.routing.FromConfig
 import app.CsvService.{CountLines, LinesCount}
 
 import scala.collection.mutable
 import scala.io.Source
 
-class CsvService(workersRouter: ActorRef) extends Actor() with ActorLogging {
+class CsvService extends Actor() with ActorLogging {
+
+  private val workersRouter = context.actorOf(Props[CsvWorker].withRouter(FromConfig), "router")
 
   override def receive: Receive = {
     case CountLines =>

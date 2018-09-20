@@ -1,43 +1,21 @@
 package app
 
-import akka.actor.{Actor, ActorLogging, ActorRef}
-import akka.http.scaladsl.Http
-import akka.http.scaladsl.server.Directives._
-import akka.http.scaladsl.server.Route
-import akka.pattern.ask
-import akka.stream.ActorMaterializer
+import akka.actor.{ActorSystem, Props}
+import akka.cluster.singleton.{ClusterSingletonProxy, ClusterSingletonProxySettings}
 import akka.util.Timeout
-import app.CsvService.{CountLines, LinesCount}
 
-import scala.concurrent.Future
 import scala.concurrent.duration._
+import scala.concurrent.ExecutionContextExecutor
 
-class WebServer(csvService: ActorRef) extends Actor() with ActorLogging {
+object WebServer {
+  def main(args: Array[String]): Unit = {
+    val host = args(0)
+    val port = args(1)
+    val system = ActorSystem("actor-system", Utils.loadConfig(host, port.toInt))
+    implicit val timeout: Timeout = Timeout(10 seconds)
+    implicit val ec: ExecutionContextExecutor = system.dispatcher
 
-  import context.dispatcher
-
-  private implicit val materializer: ActorMaterializer = ActorMaterializer()(context)
-  private implicit val timeout: Timeout = Timeout(10 seconds)
-
-  val route: Route =
-    path("") {
-      get {
-        complete((csvService ? CountLines).mapTo[LinesCount].map(_.count.toString))
-      }
-    }
-
-  private var binding: Future[Http.ServerBinding] = _
-
-  override def preStart(): Unit = {
-    val port = 8080
-    binding = Http(context.system).bindAndHandle(route, "localhost", port)
-    log.info(s"WebServer listening on port $port")
+    val csvServiceRef = system.actorOf(ClusterSingletonProxy.props("/user/csv-service", ClusterSingletonProxySettings(system)), "csv-service-proxy")
+    system.actorOf(Props(new WebHandler(csvServiceRef)), "web-handler")
   }
-
-  override def postStop(): Unit = {
-    log.info("WebServer is stopping")
-    binding.flatMap(_.unbind())
-  }
-
-  override def receive: Receive = Actor.emptyBehavior
 }

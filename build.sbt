@@ -12,4 +12,6 @@ libraryDependencies += "com.typesafe.akka" %% "akka-cluster" % akkaVer
 
 libraryDependencies += "com.typesafe.akka" %% "akka-stream" % akkaVer
 
+libraryDependencies += "com.typesafe.akka" %% "akka-cluster-tools" % akkaVer
+
 libraryDependencies += "com.typesafe.akka" %% "akka-http"   % "10.1.5"
